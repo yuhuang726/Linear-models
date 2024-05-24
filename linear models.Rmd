@@ -115,3 +115,45 @@ broom::glance(fit)
 
 Manhattan is the reference group now.
 
+
+## Diagnostics
+
+```{r}
+nyc_airbnb %>% 
+modelr::add_residuals(fit) %>% 
+  ggplot(aes(x = borough, y = resid)) +
+  geom_violin() +
+  ylim(-500, 1500)
+
+nyc_airbnb %>% 
+  modelr::add_residuals(fit) %>% 
+  ggplot(aes(x = stars, y = resid)) +
+  geom_point() +
+  facet_wrap(. ~ borough)
+```
+
+residuals are skewed.
+
+modelr::add_residuals(nyc_airbnb, fit): add a column for residuals
+ylim(-500, 1500): zoom in
+
+
+## Hypothesis tests
+
+This does t-test by default.
+
+```{r}
+fit %>% 
+  broom::tidy()
+```
+
+What about the significance of `borough`.
+
+```{r}
+fit_null = lm(price ~ stars, data = nyc_airbnb)
+fit_alt = lm(price ~ stars + borough, data = nyc_airbnb)
+
+anova(fit_null, fit_alt) %>% 
+  broom::tidy()
+```
+
