@@ -185,3 +185,79 @@ anova(fit_null, fit_alt) %>%
     ##   <chr>                         <dbl>   <dbl> <dbl>   <dbl>     <dbl>      <dbl>
     ## 1 price ~ stars                 30528  1.03e9    NA NA            NA  NA        
     ## 2 price ~ stars + borough       30525  1.01e9     3  2.53e7      256.  7.84e-164
+
+## Nest data, fit models
+
+This is pretty formal and also complex.
+
+``` r
+fit = lm(price ~ stars + borough + room_type * borough, data = nyc_airbnb)
+
+broom::tidy(fit)
+```
+
+    ## # A tibble: 13 × 5
+    ##    term                                  estimate std.error statistic  p.value
+    ##    <chr>                                    <dbl>     <dbl>     <dbl>    <dbl>
+    ##  1 (Intercept)                              121.      11.8      10.3  1.01e-24
+    ##  2 stars                                     21.8      2.42      8.97 3.06e-19
+    ##  3 boroughBrooklyn                          -55.5      2.94    -18.9  2.81e-79
+    ##  4 boroughQueens                            -86.7      5.66    -15.3  1.09e-52
+    ##  5 boroughBronx                            -108.      14.9      -7.27 3.78e-13
+    ##  6 room_typePrivate room                   -125.       2.99    -41.7  0       
+    ##  7 room_typeShared room                    -154.       8.69    -17.7  9.81e-70
+    ##  8 boroughBrooklyn:room_typePrivate room     32.4      4.31      7.51 5.97e-14
+    ##  9 boroughQueens:room_typePrivate room       56.0      7.44      7.52 5.60e-14
+    ## 10 boroughBronx:room_typePrivate room        71.6     18.0       3.98 7.03e- 5
+    ## 11 boroughBrooklyn:room_typeShared room      48.1     13.9       3.46 5.34e- 4
+    ## 12 boroughQueens:room_typeShared room        60.7     17.9       3.40 6.72e- 4
+    ## 13 boroughBronx:room_typeShared room         85.4     42.4       2.01 4.41e- 2
+
+This is more exploratory but maybe easier to understand.
+
+``` r
+nyc_airbnb %>% 
+  nest(data = -borough) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  )  %>% 
+  select(-data, -models) %>% 
+  unnest(results) %>% 
+  filter(term != "(Intercept)") %>% 
+  select(borough, term, estimate) %>% 
+  pivot_wider(
+    names_from = borough,
+    values_from = estimate
+  )
+```
+
+    ## # A tibble: 3 × 5
+    ##   term                   Bronx Queens Brooklyn Manhattan
+    ##   <chr>                  <dbl>  <dbl>    <dbl>     <dbl>
+    ## 1 stars                   4.45   9.65     21.0      27.1
+    ## 2 room_typePrivate room -52.9  -69.3     -92.2    -124. 
+    ## 3 room_typeShared room  -70.5  -95.0    -106.     -154.
+
+Let’s nest even more.
+
+``` r
+nyc_airbnb %>% 
+  filter(borough == "Manhattan") %>% 
+  nest(data = -neighborhood) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  )  %>% 
+  select(-data, -models) %>% 
+  unnest(results) %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighborhood, y = estimate)) +
+  geom_point() +
+  facet_wrap(. ~ term) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+<img src="linear-models_files/figure-gfm/unnamed-chunk-14-1.png" width="90%" />
+
+fit the model in different neighborhood.
